@@ -1,0 +1,45 @@
+[package]
+name = "STM32F103_Rust"
+version = "0.0.1"
+authors = "Leonard Blažević"
+description = "Examples of using Rust for embedded development using a STM32F103 board."
+license = "MIT"
+repository = "https://github.com/Leonard-Blazevic/Rust_For_STM32F103"
+[profile.release]
+lto = true
+debug = true
+
+[dev-dependencies]
+cortex-m-rtfm = "0.3.1"
+cortex-m-semihosting = "0.2.0"
+enc28j60 = "0.1.0"
+heapless = "0.2.4"
+m = "0.1.1"
+mfrc522 = "0.1.0"
+panic-abort = "0.1.1"
+
+[dependencies]
+nb = "0.1.1"
+panic-abort = "0.1.1"
+
+[dependencies.embedded-hal]
+features = ["unproven"]
+version = "0.1.2"
+
+[dependencies.stm32f103xx-hal]
+git = "https://github.com/japaric/stm32f103xx-hal.git"
+features = ["rt"]
+version = "*"
+
+[dependencies.stm32f1]
+version = "0.1.0"
+features = ["stm32f101", "rt"]
+
+[dependencies.cortex-m]
+version = "0.4.0"
+
+[dependencies.cortex-m-rt]
+version = "0.4.0"
+
+[dependencies.cortex-m-semihosting]
+version = "0.2.0"
