@@ -1,7 +1,7 @@
 [package]
-name = "STM32F103_Rust"
+name = "stm32_f103_rust"
 version = "0.0.1"
-authors = "Leonard Blažević"
+authors = ["Leonard Blažević"]
 description = "Examples of using Rust for embedded development using a STM32F103 board."
 license = "MIT"
 repository = "https://github.com/Leonard-Blazevic/Rust_For_STM32F103"
