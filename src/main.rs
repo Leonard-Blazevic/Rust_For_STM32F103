@@ -17,33 +17,29 @@ extern crate nb;
 use hal::prelude::*;
 use hal::stm32f103xx;
 use hal::timer::Timer;
+use hal::delay::Delay;
 
 use cortex_m::asm;
 
 fn main() {
-    let cp = cortex_m::Peripherals::take().unwrap();
     let dp = stm32f103xx::Peripherals::take().unwrap();
+    let cp = cortex_m::Peripherals::take().unwrap();
 
     let mut flash = dp.FLASH.constrain();
     let mut rcc = dp.RCC.constrain();
 
-    // Try a different clock configuration
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
-    // let clocks = rcc.cfgr
-    //     .sysclk(64.mhz())
-    //     .pclk1(32.mhz())
-    //     .freeze(&mut flash.acr);
 
     let mut gpioc = dp.GPIOC.split(&mut rcc.apb2);
 
     let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
-    // Try a different timer (even SYST)
-    let mut timer = Timer::syst(cp.SYST, 1.hz(), clocks);
+    let mut delay = Delay::new(cp.SYST, clocks);
+
     loop {
-        block!(timer.wait()).unwrap();
         led.set_high();
-        block!(timer.wait()).unwrap();
+        delay.delay_ms(1_000_u16);
         led.set_low();
+        delay.delay_ms(1_000_u16);
     }
 }
 
