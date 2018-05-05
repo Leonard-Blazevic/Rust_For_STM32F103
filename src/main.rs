@@ -33,14 +33,11 @@ fn main() {
     let mut afio = p.AFIO.constrain(&mut rcc.apb2);
 
     let mut gpiob = p.GPIOB.split(&mut rcc.apb2);
-    let mut gpioc = p.GPIOC.split(&mut rcc.apb2);
 
     let c1 = gpiob.pb6.into_alternate_push_pull(&mut gpiob.crl);
     let c2 = gpiob.pb7.into_alternate_push_pull(&mut gpiob.crl);
     let c3 = gpiob.pb8.into_alternate_push_pull(&mut gpiob.crh);
     let c4 = gpiob.pb9.into_alternate_push_pull(&mut gpiob.crh);
-
-    let mut led = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
 
     let mut pwm = p.TIM4
         .pwm(
@@ -53,31 +50,25 @@ fn main() {
         .3;
 
     let max = pwm.get_max_duty();
-    let mut timer = Timer::syst(cp.SYST, 1.hz(), clocks);
+    let mut timer = Timer::syst(cp.SYST, 2.hz(), clocks);
 
     pwm.enable();
 
     loop {
-        pwm.set_duty(max);
-        block!(timer.wait()).unwrap();
-        // dim
-        pwm.set_duty(max / 4);
+        pwm.set_duty(max);//minimal intensity
         block!(timer.wait()).unwrap();
 
-        pwm.set_duty(max / 50);
+        pwm.set_duty(7800);
         block!(timer.wait()).unwrap();
 
-        pwm.set_duty(max / 100);
-        block!(timer.wait()).unwrap();
-        // zero
-        pwm.set_duty(0);
+        pwm.set_duty(6000);
         block!(timer.wait()).unwrap();
 
-
-        /*block!(timer.wait()).unwrap();
-        led.set_high();
+        pwm.set_duty(4000);
         block!(timer.wait()).unwrap();
-        led.set_low();*/
+
+        pwm.set_duty(0);//maximal intensity
+        block!(timer.wait()).unwrap();
     }
 }
 
