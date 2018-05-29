@@ -1,29 +1,26 @@
-//! Prints "Hello, world!" on the OpenOCD console using semihosting
+//! Serial interface loopback test
 //!
-//! ---
+//! You have to short the TX and RX pins to make this program work
 
 #![feature(used)]
 #![no_std]
 
 extern crate cortex_m;
-extern crate cortex_m_rt;
+extern crate cortex_m_rt as rt;
 extern crate cortex_m_semihosting;
 extern crate panic_abort;
 
 extern crate stm32f103xx_hal as hal;
 #[macro_use(block)]
 extern crate nb;
-
 use hal::prelude::*;
 use hal::stm32f103xx;
-use hal::timer::Timer;
-//use hal::delay::Delay;
+use hal::serial::Serial;
 
 use cortex_m::asm;
 
 fn main() {
     let p = stm32f103xx::Peripherals::take().unwrap();
-    let cp = cortex_m::Peripherals::take().unwrap();
 
     let mut flash = p.FLASH.constrain();
     let mut rcc = p.RCC.constrain();
@@ -32,49 +29,48 @@ fn main() {
 
     let mut afio = p.AFIO.constrain(&mut rcc.apb2);
 
+    // let mut gpioa = p.GPIOA.split(&mut rcc.apb2);
     let mut gpiob = p.GPIOB.split(&mut rcc.apb2);
 
-    let c1 = gpiob.pb6.into_alternate_push_pull(&mut gpiob.crl);
-    let c2 = gpiob.pb7.into_alternate_push_pull(&mut gpiob.crl);
-    let c3 = gpiob.pb8.into_alternate_push_pull(&mut gpiob.crh);
-    let c4 = gpiob.pb9.into_alternate_push_pull(&mut gpiob.crh);
+    // USART1
+    // let tx = gpioa.pa9.into_alternate_push_pull(&mut gpioa.crh);
+    // let rx = gpioa.pa10;
 
-    let mut pwm = p.TIM4
-        .pwm(
-            (c1, c2, c3, c4),
-            &mut afio.mapr,
-            1.khz(),
-            clocks,
-            &mut rcc.apb1,
-        )
-        .3;
+    // USART1
+    // let tx = gpiob.pb6.into_alternate_push_pull(&mut gpiob.crl);
+    // let rx = gpiob.pb7;
 
-    let max = pwm.get_max_duty();
-    let mut timer = Timer::syst(cp.SYST, 2.hz(), clocks);
+    // USART2
+    // let tx = gpioa.pa2.into_alternate_push_pull(&mut gpioa.crl);
+    // let rx = gpioa.pa3;
 
-    pwm.enable();
+    // USART3
+    let tx = gpiob.pb10.into_alternate_push_pull(&mut gpiob.crh);
+    let rx = gpiob.pb11;
 
-    loop {
-        pwm.set_duty(max);//minimal intensity
-        block!(timer.wait()).unwrap();
+    let serial = Serial::usart3(
+        p.USART3,
+        (tx, rx),
+        &mut afio.mapr,
+        9_600.bps(),
+        clocks,
+        &mut rcc.apb1,
+    );
 
-        pwm.set_duty(7800);
-        block!(timer.wait()).unwrap();
+    let (mut tx, mut rx) = serial.split();
 
-        pwm.set_duty(6000);
-        block!(timer.wait()).unwrap();
+    let sent = b'X';
 
-        pwm.set_duty(4000);
-        block!(timer.wait()).unwrap();
+    block!(tx.write(sent)).ok();
 
-        pwm.set_duty(0);//maximal intensity
-        block!(timer.wait()).unwrap();
-    }
+    let received = block!(rx.read()).unwrap();
+
+    assert_eq!(received, sent);
+
+    asm::bkpt();
+
+    loop {}
 }
-
-
-
-
 
 // As we are not using interrupts, we just register a dummy catch all handler
 #[link_section = ".vector_table.interrupts"]
