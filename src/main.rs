@@ -11,7 +11,7 @@ extern crate panic_abort;
 
 mod pwm;
 
-use hal::gpio::gpiob::{PB0};
+use hal::gpio::gpioc::{PC13};
 use hal::gpio::gpioa::{PA8, PA9, PA10};
 use hal::gpio::{Output, PushPull, Input, Floating};
 use hal::prelude::*;
@@ -20,6 +20,7 @@ use hal::timer::{Event, Timer};
 use hal::serial::{Serial, Rx, Tx};
 use hal::pwm::{Pwm, C4};
 use rtfm::{app, Threshold};
+use hal::stm32f103xx::interrupt::Interrupt;
 
 const RED_YELLOW_PAUSE : u8 = 40;
 const YELLOW_GREEN_PAUSE : u8 = 10;
@@ -42,13 +43,14 @@ app! {
         static LEDR: PA8<Output<PushPull>>;
         static LEDY: PA9<Output<PushPull>>;
         static LEDG: PA10<Output<PushPull>>;
-        static TEMP: PB0<Input<Floating>>;
+        static TEMP: PC13<Output<PushPull>>;
         static TIMER2: Timer<hal::stm32f103xx::TIM2>;
         static RX: Rx<hal::stm32f103xx::USART3>;
         static TX: Tx<hal::stm32f103xx::USART3>;
         static RX2: Rx<hal::stm32f103xx::USART2>;
         static TX2: Tx<hal::stm32f103xx::USART2>;
         static PWM: Pwm<hal::stm32f103xx::TIM4, hal::pwm::C4>;
+        static EXTR: hal::stm32f103xx::EXTI;
     },
 
     init: {
@@ -64,18 +66,26 @@ app! {
         TIM2: {
             path: tim2_irq,
             // If omitted priority is assumed to be 1
-            // priority: 1,
+            priority: 1,
             resources: [TIMER2, TEMP, LEDR, LEDY, LEDG],
         },
+
+        EXTI0: {
+            path: exti0,
+            priority: 2,
+            resources: [TEMP, EXTR],
+		},
     }
 }
 
-fn init(p: init::Peripherals) -> init::LateResources {
+fn init(mut p: init::Peripherals) -> init::LateResources {
     let mut flash = p.device.FLASH.constrain();
     let mut rcc = p.device.RCC.constrain();
 
     let clocks = rcc.cfgr.freeze(&mut flash.acr);
     let mut timer2 = Timer::tim2(p.device.TIM2, 10.hz(), clocks, &mut rcc.apb1);
+
+    p.device.AFIO.exticr1.write(|w| unsafe { w.exti0().bits(0) });
 
     let mut afio = p.device.AFIO.constrain(&mut rcc.apb2);
 
@@ -83,11 +93,14 @@ fn init(p: init::Peripherals) -> init::LateResources {
     let mut gpiob = p.device.GPIOB.split(&mut rcc.apb2);// => odabir sabirnice
     let mut gpioa = p.device.GPIOA.split(&mut rcc.apb2);// => odabir sabirnice
 
+    let mut userLED = gpioc.pc13.into_push_pull_output(&mut gpioc.crh);
+    userLED.set_low();
+
     let mut ledR = gpioa.pa8.into_push_pull_output(&mut gpioa.crh);
     let mut ledY = gpioa.pa9.into_push_pull_output(&mut gpioa.crh);
 	let mut ledG = gpioa.pa10.into_push_pull_output(&mut gpioa.crh);
 
-    let temp = gpiob.pb0.into_floating_input(&mut gpiob.crl);
+    //let temp = gpiob.pb0.into_floating_input(&mut gpiob.crl);
 
     let tx = gpiob.pb10.into_alternate_push_pull(&mut gpiob.crh);// => odabir pinova za serijsku vezu
     let rx = gpiob.pb11;
@@ -137,7 +150,20 @@ fn init(p: init::Peripherals) -> init::LateResources {
 
     timer2.listen(Event::Update);
 
-    init::LateResources { LEDR: ledR, LEDY: ledY,  LEDG: ledG, TEMP: temp, TIMER2: timer2, RX: rx, TX: tx, PWM: pwm, RX2: rx2, TX2: tx2 }
+
+    let _int0 = gpioa.pa0.into_floating_input(&mut gpioa.crl);
+    unsafe {
+        p.core.NVIC.set_priority(hal::stm32f103xx::interrupt::Interrupt::EXTI0, 1);
+    }
+    p.core.NVIC.enable(
+        hal::stm32f103xx::interrupt::Interrupt::EXTI0,
+    );
+    p.device.EXTI.imr.write(|w| w.mr0().set_bit()); // unmask the interrupt (EXTI)
+    p.device.EXTI.emr.write(|w| w.mr0().set_bit());
+    p.device.EXTI.rtsr.write(|w| w.tr0().set_bit()); // trigger interrupt on falling edge
+	rtfm::set_pending(Interrupt::EXTI0);
+
+    init::LateResources { LEDR: ledR, LEDY: ledY,  LEDG: ledG, TEMP: userLED, TIMER2: timer2, RX: rx, TX: tx, PWM: pwm, RX2: rx2, TX2: tx2, EXTR: p.device.EXTI }
 }
 
 fn idle(_t: &mut Threshold, _r: idle::Resources) -> ! {
@@ -243,4 +269,9 @@ fn tim2_irq(_t: &mut Threshold, mut r: TIM2::Resources) {
 	        r.LEDG.set_low();
     	}
     }
+}
+
+fn exti0(t: &mut Threshold, mut r: EXTI0::Resources) {
+    r.EXTR.pr.modify(|_, w| w.pr0().set_bit());
+    r.TEMP.toggle();
 }
