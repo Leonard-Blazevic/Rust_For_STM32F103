@@ -1,5 +1,4 @@
 #![feature(proc_macro)]
-//#![deny(unsafe_code)]
 #![no_std]
 
 extern crate cortex_m;
@@ -214,16 +213,12 @@ fn idle(_t: &mut Threshold, _r: idle::Resources) -> ! {
                 	}
                 }
             }
-            else if package.data[0] == b'4' {
-            	//=> za IR kontroler
-            }
 		}
 	}
 }
 
 fn tim2_irq(_t: &mut Threshold, mut r: TIM2::Resources) {
-    static mut cnt_irq: u8 = 40;
-    //let result = lcd::sum(2,3);
+    static mut cnt_irq: u8 = 0;
 
     r.TIMER2.clear_interrupt_pending();
 
